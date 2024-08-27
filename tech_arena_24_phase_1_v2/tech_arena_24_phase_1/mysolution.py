@@ -4,10 +4,12 @@ import pandas as pd
 from seeds import known_seeds
 from utils import save_solution
 from evaluation import get_actual_demand
-
+import ClassObjects as dataObject
 
 def get_my_solution(d):
     # This is just a placeholder.
+    DC1 = dataObject.DataCentre('DC1')
+
     return [{}]
 
 
