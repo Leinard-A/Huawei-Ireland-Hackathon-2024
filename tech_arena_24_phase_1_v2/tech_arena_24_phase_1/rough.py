@@ -1,4 +1,4 @@
-class Server :
+class Server:
     ##Class Objects for the potential Server
     
     ##Going to need to cache the names of serverIDs to be able to prevent the checking of earlier serverIDs being too long.
