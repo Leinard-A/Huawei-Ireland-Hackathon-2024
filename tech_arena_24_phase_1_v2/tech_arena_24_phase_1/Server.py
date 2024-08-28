@@ -1,11 +1,11 @@
-class server(object):
-    def __init__(self, serverID, serverGen, serverType, 
+class Server:
+    def __init__(self, ID, generation, type, 
                  capacity, releaseTime, purchasePrice,
                  slotSize, energyConsumption, movingCost, 
                  operatingTime, lifeExp, sellPrice):
-        self.serverID = serverID
-        self.serverGen = serverGen
-        self.serverType = serverType
+        self.ID = ID
+        self.generation = generation
+        self.type = type
         self.capacity =  capacity
         self.releaseTime = releaseTime
         self.purchasePrice = purchasePrice
@@ -17,13 +17,13 @@ class server(object):
         self.sellPrice = sellPrice
     
     def getID(self):
-        return self.serverID
+        return self.ID
     
     def getGen(self):
-        return self.serverGen
+        return self.generation
     
     def getType(self):
-        return self.serverType
+        return self.type
     
     def getCapacity(self):
         return self.capacity
