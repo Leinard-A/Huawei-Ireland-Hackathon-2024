@@ -1,28 +1,22 @@
 import numpy as np
 import pandas as pd
-import os
 
+from DataCentre_Temp import DataCentre
 from seeds import known_seeds
 from utils import save_solution
 from evaluation import get_actual_demand
 
 seeds = known_seeds('training')
-demand = pd.read_csv('data/demand.csv')
+demandCSV = pd.read_csv('data/demand.csv')
+dataCentresCSV = pd.read_csv('data/datacenters.csv')
+dataCentres = []
 
+# demand = get_actual_demand(demandCSV)
+# print(demand)
 
-# SET SEED
-np.random.seed(seeds[0])
-
-# GET DEMAND
-actual_demand = get_actual_demand(demand)
-
-print(actual_demand)
-
-
-
-
-
-
+for i in range(4):
+    c = dataCentresCSV[dataCentresCSV['datacenter_id'] == 'DC' + str(i + 1)]
+    print(c['datacenter_id'])
 
 
 

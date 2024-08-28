@@ -6,3 +6,5 @@ class DataCentre:
         self.latencySensitivity = latencySensitivity
         self.slotCapacity = slotCapacity
         
+    def getID(self):
+        return self.ID
