@@ -8,7 +8,7 @@ class server(object):
         self.serverType = serverType
         self.capacity =  capacity
         self.releaseTime = releaseTime
-        self.purchePrice = purchasePrice
+        self.purchasePrice = purchasePrice
         self.slotSize = slotSize
         self.energyConsumption = energyConsumption
         self.movingCost = movingCost
@@ -17,8 +17,37 @@ class server(object):
         self.sellPrice = sellPrice
     
     def getID(self):
-        print(self.serverID)
+        return self.serverID
+    
+    def getGen(self):
+        return self.serverGen
+    
+    def getType(self):
+        return self.serverType
+    
+    def getCapacity(self):
+        return self.capacity
+    
+    def getReleaseTime(self):
+        return self.releaseTime
 
+    def getPurchasePrice(self):
+        return self.purchasePrice
+    
+    def getSlotSize(self):
+        return self.slotSize
+    
+    def getEnergyConsumption(self):
+        return self.energyConsumption
+    
+    def getMovingCost(self):
+        return self.movingCost
 
-newS = server(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12)
-newS.getID()
+    def getOperatingTime(self):
+        return self.operatingTime
+    
+    def getLifeExp(self):
+        return self.lifeExp
+
+    def getSellPrice(self):
+        return self.sellPrice
