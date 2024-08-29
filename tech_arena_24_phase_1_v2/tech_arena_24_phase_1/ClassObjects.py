@@ -5,12 +5,30 @@ class Server :
 
     def __Init__(self, serverID, 
                  serverGen, serverType, capacity) -> None:
-        self.serverID = serverID## We could make this the hash value of the collection of data in a way to prevent duplications.
+       ## We could make this the hash value of the collection of data in a way to prevent duplications.
         self.serverGen = serverGen
         self.serverType = serverType
         self.capacity = capacity 
+        self.serverID = hash(self)
         ##Self Explanatory
         pass 
+
+    def __hash__(self, turn, DC) -> str:
+
+       return str(hash(DC,
+            turn,
+            self.serverGen,
+            self.serverType, 
+            self.capacity,
+            ##Other Parameters
+            ))
+
+    
+    def __eq__(self, other)
+
+        return self.serverID == other.serverID 
+
+
 
 class DataCentre : 
     ##Class Objects for DataCentre 
@@ -42,7 +60,6 @@ class DataCentre :
         self.capacity = capacity
         return 
 
-
     def setAction(self, action) -> None:
         ##Moves old actions into a dictionary 
         ##With key representing the turn it was made in 
@@ -53,7 +70,7 @@ class DataCentre :
         return
 
 
-    def getAction(self) -> str:
+
         return self.currentAction
         
 
@@ -71,6 +88,7 @@ class DataCentre :
 
     def nextTurn(self) -> None:
         self.timeStep += 1 
+        return
 
 
 

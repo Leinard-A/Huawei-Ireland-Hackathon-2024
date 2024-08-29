@@ -7,8 +7,16 @@ from evaluation import get_actual_demand
 import ClassObjects as dataObject
 
 def get_my_solution(d):
-    # This is just a placeholder.
+    ##Inititalise data centre objects
     DC1 = dataObject.DataCentre('DC1')
+    DC2 = dataObject.DataCentre('DC2')
+    DC3 = dataObject.DataCentre('DC3')
+    DC4 = dataObject.DataCentre('DC4')
+    ##Filehandeling section to gather info from csv files 
+    ##About the Data Centres 
+
+
+    ##Then the logic section
 
     return [{}]
 
