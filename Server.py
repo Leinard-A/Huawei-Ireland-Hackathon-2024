@@ -1,11 +1,11 @@
 class Server:
-    def __init__(self, ID, generation, type, 
+    def __init__(self, ID, generation, Servertype, 
                  capacity, releaseTime, purchasePrice,
                  slotSize, energyConsumption, movingCost, 
                  operatingTime, lifeExp, sellPrice):
         self.ID = ID
         self.generation = generation
-        self.type = type
+        self.type = Servertype
         self.capacity =  capacity
         self.releaseTime = releaseTime
         self.purchasePrice = purchasePrice
@@ -16,38 +16,17 @@ class Server:
         self.lifeExp = lifeExp
         self.sellPrice = sellPrice
     
-    def getID(self):
-        return self.ID
-    
-    def getGen(self):
-        return self.generation
-    
-    def getType(self):
-        return self.type
-    
-    def getCapacity(self):
-        return self.capacity
-    
-    def getReleaseTime(self):
-        return self.releaseTime
+    def __hash__(self, turn, DC) -> str:
 
-    def getPurchasePrice(self):
-        return self.purchasePrice
-    
-    def getSlotSize(self):
-        return self.slotSize
-    
-    def getEnergyConsumption(self):
-        return self.energyConsumption
-    
-    def getMovingCost(self):
-        return self.movingCost
+       return str(hash(DC,
+            turn,
+            self.serverGen,
+            self.serverType, 
+            self.capacity,
+            ##Other Parameters
+            ))
 
-    def getOperatingTime(self):
-        return self.operatingTime
     
-    def getLifeExp(self):
-        return self.lifeExp
+    def __eq__(self, other)
 
-    def getSellPrice(self):
-        return self.sellPrice
+        return self.serverID == other.serverID 
