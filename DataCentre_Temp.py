@@ -5,6 +5,3 @@ class DataCentre:
         self.energyCost = energyCost
         self.latencySensitivity = latencySensitivity
         self.slotCapacity = slotCapacity
-        
-    def getID(self):
-        return self.ID

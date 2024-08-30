@@ -150,7 +150,7 @@ def get_actual_demand(demand):
             ls_sg_demand['server_generation'] = sg
             ls_sg_demand['latency_sensitivity'] = ls
             ls_sg_demand['demand'] = sg_demand.astype(int)
-            actual_demand.append(ls_sg_demand)
+            actual_demand.append(ls_sg_demand)            
 
     actual_demand = pd.concat(actual_demand, axis=0, ignore_index=True)
     actual_demand = actual_demand.pivot(index=['time_step', 'server_generation'], columns='latency_sensitivity')
@@ -210,7 +210,7 @@ def get_valid_columns(cols1, cols2):
 
 def adjust_capacity_by_failure_rate(x):
     # HELPER FUNCTION TO CALCULATE THE FAILURE RATE f
-    return int(x * 1 - truncweibull_min.rvs(0.3, 0.05, 0.1, size=1).item())
+    return int(x * (1 - truncweibull_min.rvs(0.3, 0.05, 0.1, size=1).item()))
 
 
 def check_datacenter_slots_size_constraint(fleet):
@@ -481,4 +481,3 @@ def evaluation_function(solution,
     except Exception as e:
         logger.error(e)
         return None
-
