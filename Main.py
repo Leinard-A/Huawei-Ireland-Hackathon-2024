@@ -1,78 +1,68 @@
-import numpy as np
 import pandas as pd
+import numpy as np
+import uuid
 
-from DataCentre_Temp import DataCentre
+from Server import Server
 from seeds import known_seeds
 from utils import save_solution
 from evaluation import get_actual_demand
-from evaluation import get_known
-from evaluation import get_time_step_demand
+from external import *
 
-seeds = known_seeds('training')
-demandCSV = pd.read_csv('data/demand.csv')
-dataCentresCSV = pd.read_csv('data/datacenters.csv')
-serversCSV = pd.read_csv('data/servers.csv')
+seeds = known_seeds('test')
+time_steps = 168
+slotCapacities = [0, 0, 0, 0]
+existingServers = [[], [], [], []]
 
-centers = []
-slotCapacities = []
+# FILES
+demand = pd.read_csv('data/demand.csv')
+dataCenters = pd.read_csv('data/datacenters.csv')
+servers = pd.read_csv('data/servers.csv')
 
-for x in dataCentresCSV.values:
-    center = DataCentre(x[0], x[1], x[2], x[3])
-    centers.append(center) # (Data Center, Used Up Capacity)
-    slotCapacities.append([0, x[3]])
+def get_solution(orgDemand):
+    for i in range(1, 10):
+        demand = orgDemand[orgDemand['time_step'] == i]
+        currentServerGens = demand['server_generation'].values
 
-
-def get_my_solution(d):
-    totalTimeSteps = get_known('time_steps')
-    # for i in range(totalTimeSteps):
-    for i in range(totalTimeSteps):
-        demandAtTime = d[d['time_step'] == i]
-        generations = demandAtTime['server_generation'].values # Processor Units        
-
-        for g in generations:
+        print(demand)
+        for g in currentServerGens:
             for ls in get_known('latency_sensitivity'):
-                info = serversCSV[serversCSV['server_generation'] == g]
+                info = servers[servers['server_generation'] == g]
                 capacity = info['capacity'].values.astype(int)
                 slotSize = info['slots_size'].values.astype(int)
-                serverAmount = 0
-                totalUnit = 0
-                demand = demandAtTime[demandAtTime['server_generation'] == g]
-                demand = demand[ls].values.astype(int)
+                totalUnitCapacity = 0
+                demandValue = demand[demand['server_generation'] == g][ls].values.astype(int)
                 
-                while totalUnit < demand - capacity:
-                    totalUnit += capacity
-                    serverAmount += 1                                
-                
-                for c in range(len(centers)):
-                    if (centers[c].latencySensitivity == ls):                    
-                        slotCapacities[c][0] += serverAmount * slotSize
-                        break 
+                while totalUnitCapacity < demandValue:
+                    totalUnitCapacity += capacity
+                    maxSlotCapacity = 0
+                    index = 0
+
+                    for i, row in dataCenters.iterrows():
+                        if row['latency_sensitivity'] == ls:
+                            maxSlotCapacity = row['slots_capacity']
+                            index = i
+                            break                          
+
+                    if slotCapacities[index] + slotSize > maxSlotCapacity:
+                        continue
+
+                    s = Server(uuid.uuid4(), g)                    
+                    slotCapacities[index] += slotSize
+                    existingServers[index].append(s)
+
+    print(slotCapacities)
+    pass
 
 
-    print('--------------')                            
-    for i in range(len(slotCapacities)):
-        print(slotCapacities[i][0], centers[i].ID, centers[i].latencySensitivity)   
+for seed in seeds:
+    # SET THE RANDOM SEED
+    np.random.seed(seed)
 
-    print('--------------')                            
-    print(demandAtTime)
-    return [{}]
+    # GET DEMAND
+    actual_demand = get_actual_demand(demand)
 
+    # SOLUTION
+    solution = get_solution(actual_demand)
 
-# SET RANDOM SEED
-np.random.seed(seeds[0])
-
-# GET ACTUAL DEMAND
-demand = get_actual_demand(demandCSV)
-
-# CALL YOUR APPROACH HERE
-solution = get_my_solution(demand)
-
-# examp = seeds[0]
-
-# # Numpy.random.seed makes random numbers predictable
-# # Everytime the seed is reset with the same seed value, the same set of numbers will be generated
-
-# np.random.seed(examp)
-# print(np.random.rand(4))
-# np.random.seed(examp)
-# print(np.random.rand(4))
+    # SAVE SOLUTION
+    # save_solution(solution, f'./output/{seed}.json')
