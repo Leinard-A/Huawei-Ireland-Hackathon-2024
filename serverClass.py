@@ -21,3 +21,9 @@ class Server:
     def __eq__(self, other) -> bool: 
 
         return self.serverID == other.serverID 
+
+
+##To generate a unique ID for the server class.
+def generateUniqueID(serverType, timeStep, DC):
+    ID = hash((serverType, timeStep, DC ))
+    return ID 
