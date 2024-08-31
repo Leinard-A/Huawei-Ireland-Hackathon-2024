@@ -27,10 +27,3 @@ class FileHandling:
             self.accessFileData()
         return json.dumps(self.fileData, indent=4)
 
-# test ./data/servers.csv
-fileHandler = FileHandling('./data/servers.csv')
-try:
-    jsonData = fileHandler.convertToJson()
-    print(jsonData)
-except FileNotFoundError as outpute:
-    print(outpute)
