@@ -2,7 +2,7 @@ class Server:
     def __init__(self, ID, generation, Servertype, 
                  capacity, releaseTime, purchasePrice,
                  slotSize, energyConsumption, movingCost, 
-                 operatingTime, lifeExp, sellPrice):
+                 operatingTime, lifeExp, sellPrice) -> None:
         self.ID = ID
         self.generation = generation
         self.type = Servertype
@@ -15,18 +15,9 @@ class Server:
         self.operatingTime = operatingTime
         self.lifeExp = lifeExp
         self.sellPrice = sellPrice
-    
-    def __hash__(self, turn, DC) -> str:
-
-       return str(hash(DC,
-            turn,
-            self.serverGen,
-            self.serverType, 
-            self.capacity,
-            ##Other Parameters
-            ))
+        pass
 
     
-    def __eq__(self, other)
+    def __eq__(self, other) -> bool: 
 
         return self.serverID == other.serverID 
