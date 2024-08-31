@@ -46,15 +46,17 @@ def get_my_solution(d):
         DC4D[3]                    
     )
 
-    for i in range(int((d['time_step'].count()/2))):
+    for i in range(168):
         time_stepDemand = d[d['time_step']== i+1].values
         currentDemand = {}
-        for items in range(len(time_stepDemand)):
-            print(time_stepDemand[items])
-            currentDemand['highDemand'] = time_stepDemand[items][2]
-            currentDemand['lowDemand'] = time_stepDemand[items][3]
-            currentDemand['mediumDemand'] = time_stepDemand[items][4]
-
+        for item in range(len(time_stepDemand)):
+            ##Places the current demands in a dictionary and is accessible by the server type/generation
+            print(time_stepDemand)
+            currentDemand[time_stepDemand[item][1]] = {
+                'high': time_stepDemand[item][2],
+                'medium': time_stepDemand[item][4],
+                'low': time_stepDemand[item][3]
+            }
         ##Then Process the demand data and have it in a stored format
         ##This is the area where the decision making goes- Leinard
 
