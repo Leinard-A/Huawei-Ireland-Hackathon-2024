@@ -1,7 +1,11 @@
-class DataCentre:
-    def __init__(self, ID, energyCost, 
-                 latencySensitivity, slotCapacity):
+import pandas as pd
+
+dataCentreCSV = pd.read_csv('data/datacenters.csv')
+
+class DataCentre:    
+    def __init__(self, ID):
         self.ID = ID
-        self.energyCost = energyCost
-        self.latencySensitivity = latencySensitivity
-        self.slotCapacity = slotCapacity
+    
+
+    def getInfo(id, key):
+        return dataCentreCSV.loc[dataCentreCSV['datacenter_id'] == id][key]

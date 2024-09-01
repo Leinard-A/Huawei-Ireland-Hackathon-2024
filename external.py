@@ -2,6 +2,8 @@ import pandas as pd
 import numpy as np
 import scipy as sp
 
+dataCentresCSV = pd.read_csv('data/datacenters.csv')
+
 def get_known(key):
     # STORE SOME CONFIGURATION VARIABLES
     if key == 'datacenter_id':
@@ -39,3 +41,12 @@ def get_known(key):
                 'cost_of_energy',
                 'latency_sensitivity', 
                 'slots_capacity']
+
+def createDataCentres():
+    dfs = []
+    for n in range(0, 4):
+        df = pd.DataFrame(columns=['ID', 'server_generation', 'slot_size', 'bought_at_time_step', 'expiration_time_step'])
+        df.Name = 'DC' + str(n + 1)
+        dfs.append(df)
+    
+    return dfs
