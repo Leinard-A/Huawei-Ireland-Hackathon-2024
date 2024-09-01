@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import math
 import uuid
+import json
 
 from Server import Server
 from DataCentre_Temp import DataCentre
@@ -17,6 +18,7 @@ seeds = known_seeds('test')
 timeSteps = get_known('time_steps')
 dataCentres = createDataCentres()
 usedSlots = [0, 0, 0, 0]
+actions = []
 
 # CSVS
 demandCSV = pd.read_csv('data/demand.csv')
@@ -33,6 +35,16 @@ def checkLife(timeStep):
             usedSlots[dI] -= totalSlots
             dataCentres[dI].drop(times.index, inplace=True)
 
+def addAction(row):
+    dic = {
+        'time_step': row['time_step'],
+        'datacenter_id': row['datacenter_id'],
+        'server_generation': row['server_generation'],
+        'server_id': row['ID'],
+        'action': 'buy'
+    }
+
+    actions.append(dic)
 
 def buy(row):
     generation = row['server_generation']
@@ -59,11 +71,22 @@ def buy(row):
                 if usedSlots[i] + totalSlotSize <= maxCapacity:
                     usedSlots[i] += totalSlotSize
                     df = pd.DataFrame()
-                    df['ID'] = [str(uuid.uuid4()) for id in range(amount)]
+                    actionsDF = pd.DataFrame()
+                    IDs = [str(uuid.uuid4()) for id in range(amount)]
+
+                    actionsDF['ID'] = IDs
+                    actionsDF['time_step'] = timeStep
+                    actionsDF['datacenter_id'] = name
+                    actionsDF['server_generation'] = generation   
+
+                    df['ID'] = IDs
                     df['server_generation'] = generation
                     df['slot_size'] = slotSize
                     df['bought_at_time_step'] = timeStep
-                    df['expiration_time_step'] = timeStep + lifeExp
+                    df['expiration_time_step'] = timeStep + lifeExp          
+                    
+                    actionsDF.apply(addAction, axis=1)
+
                     dataCentres[i] = pd.concat([dc, df], ignore_index=True)
                     dataCentres[i].Name = name
                     break
@@ -74,8 +97,9 @@ def get_solution(demand):
         checkLife(i)
         currentDemand = demand.loc[demand['time_step'] == i]
         currentDemand.apply(buy, axis=1)    
-
-    dataCentres[0].to_csv('test.csv')    
+    
+    with open('solution.json', 'w') as fp:
+        json.dump(actions, fp)
 
 # SET THE RANDOM SEED
 for seed in seeds:
