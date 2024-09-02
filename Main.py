@@ -1,112 +1,92 @@
-import pandas as pd
 import numpy as np
+import pandas as pd
 import math
 import uuid
-import json
 
+# Class importing
 from Server import Server
-from DataCentre_Temp import DataCentre
+from DataCentre import createDataCentres
 
+# Function importing
 from seeds import known_seeds
 from evaluation import get_actual_demand
-from external import createDataCentres
-from external import get_known
 from ast import literal_eval
 
-
-seeds = known_seeds('test')
-timeSteps = get_known('time_steps')
-dataCentres = createDataCentres()
-usedSlots = [0, 0, 0, 0]
-actions = []
-
-# CSVS
+# CVS Handling
 demandCSV = pd.read_csv('data/demand.csv')
-dataCentreCSV = pd.read_csv('data/datacenters.csv')
 
+# Known information
+seeds = known_seeds('test')
+latencySensitivities = ['low', 'medium', 'high']
+totalTimeSteps = 168
 
-def checkLife(timeStep):
-    for dI in range(len(dataCentres)):
-        dc = dataCentres[dI]
-        times = dc.loc[dc['expiration_time_step'] == timeStep] 
+# Variables
+dataCentres = createDataCentres(4)
 
-        if not times.empty:
-            totalSlots = times['slot_size'].sum()
-            usedSlots[dI] -= totalSlots
-            dataCentres[dI].drop(times.index, inplace=True)
-
-def addAction(row):
-    dic = {
-        'time_step': row['time_step'],
-        'datacenter_id': row['datacenter_id'],
-        'server_generation': row['server_generation'],
-        'server_id': row['ID'],
-        'action': 'buy'
-    }
-
-    actions.append(dic)
-
-def buy(row):
+def buy(row):    
     generation = row['server_generation']
     timeStep = row['time_step']
-    releaseDate = literal_eval(Server.getInfo(generation, 'release_time').values.tolist()[0])
-    capacity = int(Server.getInfo(generation, 'capacity').values[0])
-    slotSize = int(Server.getInfo(generation, 'slots_size').values[0])
-    lifeExp = int(Server.getInfo(generation, 'life_expectancy').values[0])
+    releaseRange = literal_eval(Server.getInfo(generation, 'release_time').values.tolist()[0])
+    startDate = releaseRange[0]
+    endDate = releaseRange[1]    
 
-    if releaseDate[0] <= timeStep <= releaseDate[1]:
-        for ls in get_known('latency_sensitivity'):
-            demand = row[ls]
-            amount = math.ceil(demand / capacity)
-            dcInfo = dataCentreCSV.loc[dataCentreCSV['latency_sensitivity'] == ls]
-            dcIndices = dcInfo.index
+    # Checks if server can be bought depending on its release time
+    if startDate <=  timeStep <= endDate:        
+        for ls in latencySensitivities:
+            # Find data centre matching latency sensitivity and add servers
+            for dc in dataCentres:
+                if dc['latency_sensitivity'] == ls:
+                    usedSlots = dc['servers']['slot_size'].sum()
+                    maxCapacity = dc['slots_capacity']
+                    currentServerAmount = len(dc['servers'].loc[dc['servers']['server_generation'] == generation]) # Get the amount of a specific server generation in the data centre
+                    demand = row[ls] # The demand for processors based on latency sensitivity
+                    capacity = Server.getInfo(generation, 'capacity').values[0].astype(int) # The amount of processors in a server based on a server generation 
+                    slotSize = Server.getInfo(generation, 'slots_size').values[0].astype(int)              
+                    lifeExp = Server.getInfo(generation, 'life_expectancy').values[0].astype(int)
 
-            for i in dcIndices:
-                dc = dataCentres[i]
-                name = dc.Name
+                    serverAmount = math.ceil(demand / capacity) # Calculate server amount needed to cover for demand            
+                    serverAmount = serverAmount - currentServerAmount if serverAmount > currentServerAmount else 0 # Change server amount if the current demanded servers is bigger than the current amount of servers
+                    totalSlotSize = serverAmount * slotSize # Calculate slot amount needed to hold servers
 
-                maxCapacity = int(DataCentre.getInfo('DC' + str(i + 1), 'slots_capacity').values[0])
-                totalSlotSize = amount * slotSize
+                    if serverAmount == 0:
+                        break
 
-                if usedSlots[i] + totalSlotSize <= maxCapacity:
-                    usedSlots[i] += totalSlotSize
-                    df = pd.DataFrame()
-                    actionsDF = pd.DataFrame()
-                    IDs = [str(uuid.uuid4()) for id in range(amount)]
+                    # Check if there is enough slots available
+                    if usedSlots + totalSlotSize < maxCapacity:
+                        df = pd.DataFrame()
 
-                    actionsDF['ID'] = IDs
-                    actionsDF['time_step'] = timeStep
-                    actionsDF['datacenter_id'] = name
-                    actionsDF['server_generation'] = generation   
+                        df['server_id'] = [str(uuid.uuid4()) for x in range(serverAmount)]
+                        df['server_generation'] = generation
+                        df['slot_size'] = slotSize
+                        df['bought_date'] = timeStep
+                        df['expire_date'] = timeStep + lifeExp
 
-                    df['ID'] = IDs
-                    df['server_generation'] = generation
-                    df['slot_size'] = slotSize
-                    df['bought_at_time_step'] = timeStep
-                    df['expiration_time_step'] = timeStep + lifeExp          
-                    
-                    actionsDF.apply(addAction, axis=1)
+                        dc['servers'] = pd.concat([dc['servers'], df], ignore_index=True)
+                        break
 
-                    dataCentres[i] = pd.concat([dc, df], ignore_index=True)
-                    dataCentres[i].Name = name
-                    break
+            
 
+def get_solution(demands):
+    # Create dictionary of actions variable
+    actions = [] 
 
-def get_solution(demand):
-    for i in range(1, timeSteps):
-        checkLife(i)
-        currentDemand = demand.loc[demand['time_step'] == i]
-        currentDemand.apply(buy, axis=1)    
-    
-    with open('solution.json', 'w') as fp:
-        json.dump(actions, fp)
+    for i in range(1, 20):                
+        currentDemands = demands.loc[demands['time_step'] == i] # Get demands based on time step        
 
-# SET THE RANDOM SEED
+        # Calculate server amount        
+        currentDemands.apply(buy, axis=1)     
+        print(currentDemands)          
+
+    print(len(dataCentres[0]['servers'].loc[dataCentres[0]['servers']['server_generation'] == 'CPU.S1']) * 60)
+    return actions
+
+# BEGIN
 for seed in seeds:
+    # SET RANDOM SEED
     np.random.seed(seed)
 
-    # GET ACTUAL DEMANDS
+    # GET RANDOMIZED DEMANDS
     actualDemands = get_actual_demand(demandCSV)
 
-    # SOLUTION
+    # CALCULATE
     solution = get_solution(actualDemands)
