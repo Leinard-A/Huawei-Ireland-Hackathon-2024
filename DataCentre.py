@@ -2,6 +2,10 @@ import pandas as pd
 
 dataCentreCSV = pd.read_csv('data/datacenters.csv')
 
+
+def getInfo(id, key):
+    return dataCentreCSV.loc[dataCentreCSV['datacenter_id'] == id][key]
+
 def createDataCentres(size):
     dcDicts = []
     for i in range(1, size + 1):
@@ -11,19 +15,10 @@ def createDataCentres(size):
         dcDict = {
             'id': ID,
             'servers': df,
-            'latency_sensitivity': DataCentre.getInfo(ID, 'latency_sensitivity').values,
-            'slots_capacity': DataCentre.getInfo(ID, 'slots_capacity').values[0].astype(int)
+            'latency_sensitivity': getInfo(ID, 'latency_sensitivity').values,
+            'slots_capacity': getInfo(ID, 'slots_capacity').values[0].astype(int)
         }
 
         dcDicts.append(dcDict)
     
     return dcDicts
-
-
-class DataCentre:    
-    def __init__(self, ID):
-        self.ID = ID
-    
-
-    def getInfo(id, key):
-        return dataCentreCSV.loc[dataCentreCSV['datacenter_id'] == id][key]
