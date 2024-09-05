@@ -17,7 +17,7 @@ from ast import literal_eval
 demandCSV = pd.read_csv('data/demand.csv')
 
 # Known
-seeds = known_seeds('training')
+seeds = known_seeds('test')
 latencySensitivities = ['low', 'medium', 'high']
 timeSteps = 168
 
@@ -147,7 +147,7 @@ def manage(row):
                         addToDict(newServers['server_id'], timeStep, iDC['id'], newServers['server_generation'], 'buy')
 
                         remainingServerAmount -= iAvailableServerAmount
-                        remainingSlotAmount -= (iAvailableServerAmount * slotSize)
+                        remainingSlotAmount -= (iAvailableServerAmount * slotSize)                                                
                     else: # Buy servers to meet demand                                                     
                         newServers = createNewServers(remainingServerAmount, generation, slotSize, timeStep, lifeExp, iDC['id'])
                         iDC['servers'] = pd.concat([iServers, newServers], ignore_index=True)
@@ -155,8 +155,8 @@ def manage(row):
 
                         remainingServerAmount = 0
                         remainingSlotAmount = 0
-                        break
-            
+                        break                    
+
             # REPLACE OLD GENERATIONS
             if remainingServerAmount > 0:
                 full = True
@@ -212,9 +212,10 @@ def manage(row):
 
                         remainingServerAmount -= oldServerAmount
                         remainingSlotAmount -= oldSlotAmount
-                                
+        
+# CALCULATE ACTIONS
 def get_solution(actualDemands):       
-    for t in range(1, timeSteps):
+    for t in range(1, 118 + 1):
         timeStepDemands = actualDemands.loc[actualDemands['time_step'] == t]
 
         # Management
@@ -223,6 +224,7 @@ def get_solution(actualDemands):
 
     return actions
 
+# BEGINNING 
 for seed in seeds:    
     actions = []
     dataCentres = createDataCentres(4)
@@ -236,7 +238,6 @@ for seed in seeds:
     # CALCULATE
     solution = get_solution(actualDemands)
 
-    with open('{}.json'.format(seed), 'w') as fp:
-        json.dump(solution, fp)
+    print('SEED DONE ->', seed)
 
-print('DONE!')
+print('FINISHED!')
