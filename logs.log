@@ -15,3 +15,4 @@
 2024-09-05 10:31:57,388 | ERROR | ('Constraint 2 has been violated.', 118)
 2024-09-05 10:43:31,781 | ERROR | ('Constraint 2 has been violated.', 37)
 2024-09-05 11:51:45,354 | ERROR | Constraint 2 has been violated.
+2024-09-05 13:12:52,737 | ERROR | Cannot set a DataFrame with multiple columns to the single column rt_is_fine

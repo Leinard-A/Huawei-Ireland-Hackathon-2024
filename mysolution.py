@@ -115,7 +115,6 @@ def manage(row):
         if d_serverAmount > 0:
             remainingServerAmount = d_serverAmount # For dictionary creation
             remainingSlotAmount = d_slotAmount # For logic      
-            full = True
 
             '''
                 Iterate through each data centre fill them with servers to meet demand.
@@ -132,10 +131,9 @@ def manage(row):
                     iAvailableSlots = iMaxCapacity - iUsedSlots
 
                     # Check if there are enough available slots to buy new servers
-                    if iAvailableSlots <= 0:
+                    if iAvailableSlots <= slotSize:
                         continue
                     
-                    full = False
                     # Buy as much servers as possible to try and satisfy demand
                     if remainingSlotAmount > iAvailableSlots:
                         iAvailableServerAmount = math.floor(iAvailableSlots / slotSize)
@@ -157,69 +155,70 @@ def manage(row):
                         remainingSlotAmount = 0
                         break                    
 
-            # REPLACE OLD GENERATIONS
-            if remainingServerAmount > 0:
-                full = True
+            # # REPLACE OLD GENERATIONS
+            # if remainingServerAmount > 0:
+            #     full = True
             
-            if not full:
-                continue
+            # if not full:
+            #     continue
 
-            generationNumber = int(generation[len(generation) - 1])
-            generationPrefix = generation[:len(generation) - 1]
+            # generationNumber = int(generation[len(generation) - 1])
+            # generationPrefix = generation[:len(generation) - 1]
 
-            if generationNumber == 1:
-                continue
+            # if generationNumber == 1:
+            #     continue
             
-            for iDC in dataCentres:
-                if iDC['latency_sensitivity'] == ls:
-                    iServers = iDC['servers']
-                    iMaxCapacity = iDC['slots_capacity']
-                    oldServersDF = pd.DataFrame()
-                    oldServerIndicies = []
-                    oldGenerations = []
+            # for iDC in dataCentres:
+            #     if iDC['latency_sensitivity'] == ls:
+            #         iServers = iDC['servers']
+            #         iMaxCapacity = iDC['slots_capacity']
+            #         oldServersDF = pd.DataFrame()
+            #         oldServerIndicies = []
+            #         oldGenerations = []
 
-                    for n in range(1, generationNumber):
-                        oldGenerations.append(generationPrefix + str(n))
+            #         for n in range(1, generationNumber):
+            #             oldGenerations.append(generationPrefix + str(n))
                     
-                    oldServers = iServers.loc[iServers['server_generation'].isin(oldGenerations)]                        
-                    oldServersDF = pd.concat([oldServersDF, oldServers], ignore_index=True)
-                    oldServerIndicies += oldServers.index.values.tolist()
+            #         oldServers = iServers.loc[iServers['server_generation'].isin(oldGenerations)]                        
+            #         oldServersDF = pd.concat([oldServersDF, oldServers], ignore_index=True)
+            #         oldServerIndicies += oldServers.index.values.tolist()
 
-                    if oldServersDF.empty:
-                        continue
+            #         if oldServersDF.empty:
+            #             continue
 
-                    oldServerAmount = len(oldServerIndicies)
-                    oldSlotAmount = oldServersDF['slot_size'].sum()
+            #         oldServerAmount = len(oldServerIndicies)
+            #         oldSlotAmount = oldServersDF['slot_size'].sum()
 
-                    if remainingServerAmount < oldServerAmount:
-                        iDC['servers'].drop(oldServerIndicies[:remainingServerAmount], inplace=True)
-                        addToDict(oldServers['server_id'][:remainingServerAmount], timeStep, iDC['id'], oldServers['server_generation'][:remainingServerAmount], 'dismiss')
+            #         if remainingServerAmount < oldServerAmount:
+            #             iDC['servers'].drop(oldServerIndicies[:remainingServerAmount], inplace=True)
+            #             addToDict(oldServers['server_id'][:remainingServerAmount], timeStep, iDC['id'], oldServers['server_generation'][:remainingServerAmount], 'dismiss')
 
-                        newServers = createNewServers(remainingServerAmount, generation, slotSize, timeStep, lifeExp, iDC['id'])
-                        iDC['servers'] = pd.concat([iDC['servers'], newServers], ignore_index=True)
-                        addToDict(newServers['server_id'], timeStep, iDC['id'], newServers['server_generation'], 'buy')
+            #             newServers = createNewServers(remainingServerAmount, generation, slotSize, timeStep, lifeExp, iDC['id'])
+            #             iDC['servers'] = pd.concat([iDC['servers'], newServers], ignore_index=True)
+            #             addToDict(newServers['server_id'], timeStep, iDC['id'], newServers['server_generation'], 'buy')
 
-                        remainingServerAmount = 0
-                        remainingSlotAmount = 0
-                        break
-                    else:
-                        iDC['servers'].drop(oldServerIndicies, inplace=True)
-                        addToDict(oldServers['server_id'], timeStep, iDC['id'], oldServers['server_generation'], 'dismiss')
+            #             remainingServerAmount = 0
+            #             remainingSlotAmount = 0
+            #             break
+            #         else:
+            #             iDC['servers'].drop(oldServerIndicies, inplace=True)
+            #             addToDict(oldServers['server_id'], timeStep, iDC['id'], oldServers['server_generation'], 'dismiss')
 
-                        newServers = createNewServers(oldServerAmount, generation, slotSize, timeStep, lifeExp, iDC['id'])
-                        iDC['servers'] = pd.concat([iDC['servers'], newServers], ignore_index=True)
-                        addToDict(newServers['server_id'], timeStep, iDC['id'], newServers['server_generation'], 'buy')
+            #             newServers = createNewServers(oldServerAmount, generation, slotSize, timeStep, lifeExp, iDC['id'])
+            #             iDC['servers'] = pd.concat([iDC['servers'], newServers], ignore_index=True)
+            #             addToDict(newServers['server_id'], timeStep, iDC['id'], newServers['server_generation'], 'buy')
 
-                        remainingServerAmount -= oldServerAmount
-                        remainingSlotAmount -= oldSlotAmount
+            #             remainingServerAmount -= oldServerAmount
+            #             remainingSlotAmount -= oldSlotAmount
         
 # CALCULATE ACTIONS
 def get_solution(actualDemands):       
-    for t in range(1, 118 + 1):
+    for t in range(1, timeSteps + 1):
         timeStepDemands = actualDemands.loc[actualDemands['time_step'] == t]
 
         # Management
         checkExpiration(t)
+        print(t)
         timeStepDemands.apply(manage, axis=1)        
 
     return actions

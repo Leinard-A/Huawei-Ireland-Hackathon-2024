@@ -53,7 +53,7 @@ def checkExpiration(timeStep):
         
         indicies = expiredServers.index
         dc['servers'].drop(indicies, inplace=True)
-        addToDict(expiredServers, 'dismiss-expire', timeStep)
+        addToDict(expiredServers, 'dismiss', timeStep)
 
 def createNewServers(amount, generation, slotSize, timeStep, duration, dcID):
     df = pd.DataFrame()
@@ -106,12 +106,11 @@ def manage(row):
     if not (startDate <= timeStep <= endDate):
         return
     
-    # If so, buy servers
     for ls in latencySensitivities:
         remaining_serverAmount = diff_serverAmountDF[ls].values[0].astype(int)
         remaining_slotAmount = remaining_serverAmount * slotSize
-                
-        # Check if more servers are needed to satisfy demand
+
+        # Check if servers are needed to satisfy demand
         if remaining_serverAmount <= 0:
             continue
 
@@ -124,30 +123,71 @@ def manage(row):
                 maxSlots = dc['slots_capacity']
                 availableSlots = maxSlots - usedSlots
 
-                # If there are slots available to buy
+                # If there are not enough slots available, continue
                 if availableSlots < slotSize:
                     continue
-
-                newServers = pd.DataFrame()
-                if remaining_slotAmount <= availableSlots:
-                    newServers = createNewServers(remaining_serverAmount, generation, slotSize, timeStep, duration, dcID)
+                
+                amount = 0
+                if remaining_slotAmount <= availableSlots: # If there are enough available slots to hold the new servers
+                    amount = remaining_serverAmount          
 
                     remaining_serverAmount = 0
                     remaining_slotAmount = 0
-                else:
-                    availableServerAmount = math.floor(availableSlots / slotSize)
-                    
-                    newServers = createNewServers(availableServerAmount, generation, slotSize, timeStep, duration, dcID)
+                else: # Buy as much servers to meet demand
+                    amount = math.floor(availableSlots / slotSize)
 
-                    remaining_serverAmount -= availableServerAmount
-                    remaining_slotAmount -= availableServerAmount * slotSize
+                    remaining_serverAmount -= amount
+                    remaining_slotAmount -= (amount * slotSize)
 
-                dcR['servers'] = pd.concat([dcR['servers'], newServers], ignore_index=True)
-                addToDict(newServers, 'buy', timeStep)     
+                newServers = createNewServers(amount, generation, slotSize, timeStep, duration, dcID)
+                dc['servers'] = pd.concat([s, newServers], ignore_index=True) 
+                addToDict(newServers, 'buy', timeStep)
 
                 if remaining_serverAmount == 0:
-                    break    
+                    break
 
+    # If so, buy servers
+    # for ls in latencySensitivities:
+    #     remaining_serverAmount = diff_serverAmountDF[ls].values[0].astype(int)
+    #     remaining_slotAmount = remaining_serverAmount * slotSize
+                
+    #     # Check if more servers are needed to satisfy demand
+    #     if remaining_serverAmount <= 0:
+    #         continue
+
+    #     # Buy more servers
+    #     for dc in dataCentres:
+    #         if dc['latency_sensitivity'] == ls:
+    #             dcID = dc['id']
+    #             s = dc['servers']
+    #             usedSlots = s['slot_size'].sum()
+    #             maxSlots = dc['slots_capacity']
+    #             availableSlots = maxSlots - usedSlots
+
+    #             # If there are slots available to buy
+    #             if availableSlots < slotSize:
+    #                 continue
+
+    #             newServers = pd.DataFrame()
+    #             if remaining_slotAmount <= availableSlots:
+    #                 newServers = createNewServers(remaining_serverAmount, generation, slotSize, timeStep, duration, dcID)
+
+    #                 remaining_serverAmount = 0
+    #                 remaining_slotAmount = 0
+    #             else:
+    #                 availableServerAmount = math.floor(availableSlots / slotSize)
+                    
+    #                 newServers = createNewServers(availableServerAmount, generation, slotSize, timeStep, duration, dcID)
+
+    #                 remaining_serverAmount -= availableServerAmount
+    #                 remaining_slotAmount -= availableServerAmount * slotSize
+
+    #             dcR['servers'] = pd.concat([dcR['servers'], newServers], ignore_index=True)
+    #             addToDict(newServers, 'buy', timeStep)     
+
+    #             if remaining_serverAmount == 0:
+    #                 break    
+        
         # # Replace old generations of servers with new ones
         # # Check if there are still remaining servers needed to be bought
         # if remaining_serverAmount <= 0:
@@ -210,13 +250,10 @@ def get_solution(actualDemands):
     for t in range(1, timeSteps + 1):        
         demands_t = actualDemands.loc[actualDemands['time_step'] == t]
         
-        checkExpiration(t)        
+        checkExpiration(t)           
+        print(t)
         demands_t.apply(manage, axis=1)        
-    
-    print('-----')
-    for dc in dataCentres:
-        s = dc['servers']
-        print(t, s['slot_size'].sum(), dc['slots_capacity'])  
+
     return actions
 
 # BEGINNING
