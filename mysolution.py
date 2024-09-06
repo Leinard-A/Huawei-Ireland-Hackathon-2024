@@ -1,251 +1,306 @@
 import numpy as np
 import pandas as pd
-import math
+import matplotlib.pyplot as plt
+from scipy.stats import truncweibull_min
 import uuid
 import json
+import math
 
-# Class importing
+# Class import
 import Server
-from DataCentre import createDataCentres
 
-# Function importing
+# Function import
 from seeds import known_seeds
 from evaluation import get_actual_demand
 from ast import literal_eval
+from DataCentre import createDataCentres
+from known import getKnown
+from profit import findRevenue
 
 # CSV
 demandCSV = pd.read_csv('data/demand.csv')
 
 # Known
 seeds = known_seeds('test')
-latencySensitivities = ['low', 'medium', 'high']
-timeSteps = 168
+latencySensitivities = getKnown('ls')
+timeSteps = getKnown('timeStep')
+order = True
 
-# Variables
-global actions, dataCentres
+# ------------ DICTIONARY LOGIC
+def actionDict(servers, action, timeStep):
+    servers = servers.reset_index(drop=True)
 
-# DICTIONARY LOGIC
-def addAction(row, action):
-    if np.isnan(row['time_step']):
-        return
+    timeSteps = [timeStep] * len(servers)
+    dcIDs = servers['datacenter_id']
+    generations = servers['server_generation']
+    serverIDs = servers['server_id']    
 
-    dict = {
-        'time_step': row['time_step'],
-        'datacenter_id': row['datacenter_id'],
-        'server_generation': row['server_generation'],
-        'server_id': row['ID'],
-        'action': action
-    }
-
-    actions.append(dict)
-
-def addToDict(IDs, timeStep, dcID, generation, action):    
     df = pd.DataFrame()
-
-    df['ID'] = IDs
-    df['time_step'] = timeStep
-    df['datacenter_id'] = dcID
-    df['server_generation'] = generation
-
-    df.apply(addAction, action=action, axis=1)
-
     
-# SERVER LOGIC
+    df['time_step'] = timeSteps
+    df['datacenter_id'] = dcIDs
+    df['server_generation'] = generations
+    df['server_id'] = serverIDs
+    df['action'] = action
+
+    return df.to_dict('records')
+
+# ------------ SERVER LOGIC
+def adjustFailure(capacity):
+    return int(capacity * (1 - truncweibull_min.rvs(0.3, 0.05, 0.1, size=1)).item())
+
+def orderBy(demand_t, mode):
+    newDF = demand_t.copy()
+
+    if mode == 'generation':
+        genOrder = demand_t['server_generation'].values.tolist()
+        genNums = [0] * len(genOrder)
+
+        for i, g in enumerate(genOrder):
+            genNums[i] = int(g.split('.')[1][1])
+        
+        newDF['GenNums'] = genNums
+        newDF = newDF.sort_values(by=['GenNums'], ascending=False)
+        newDF.drop(columns=['GenNums'], inplace=True)
+    elif mode == 'demand':
+        totals = []
+
+        for i, g in demand_t.iterrows():            
+            t = g['low'] + g['medium'] + g['high']
+
+            totals.append(t)
+        
+        newDF['TotalDemand'] = totals
+        newDF = newDF.sort_values(by=['TotalDemand'], ascending=False)
+        newDF.drop(columns=['TotalDemand'], inplace=True)
+    elif mode == 'revenue':        
+        revenues = []
+
+        for i, g in demand_t.iterrows():            
+            tr = 0
+
+            for ls in latencySensitivities:
+                r = findRevenue(g['server_generation'], ls, g[ls])
+
+                tr += r
+            
+            revenues.append(tr)
+
+        newDF['TotalRevenue'] = revenues                
+        newDF = newDF.sort_values(by=['TotalRevenue'], ascending=False)                
+        newDF.drop(columns=['TotalRevenue'], inplace=True)        
+
+    return newDF
+
 def checkExpiration(timeStep):
-    for dc in dataCentres:
-        ##Gets a server within the datacentre and compares its expire date to the current timeStep
-        servers = dc['servers']
-        expiredServers = servers.loc[servers['expire_date'] == timeStep]
-        ## If true the server ID is placed in a list 
-        # Check if there are expired servers
+    for dc in datacentres:
+        s = dc['servers']
+        expiredServers = s.loc[s['expire_date'] == timeStep]
+
+        # Check if there are no expired servers
         if expiredServers.empty:
             continue
-        
-        ##Dismiss server and places the action within a dict
-        addToDict(expiredServers['server_id'], timeStep, dc['id'], expiredServers['server_generation'], 'dismiss')
+            
+        i = expiredServers.index
+        dc['servers'].drop(i, inplace=True)
+        dc['servers'] = dc['servers'].reset_index(drop=True)
+        actions.extend(actionDict(expiredServers, 'dismiss', timeStep))
 
-        indices = expiredServers.index
-        dc['servers'].drop(indices, inplace=True)
-
-def createNewServers(amount, generation, slotSize, timeStep, lifeExp, dcID):
-    df = pd.DataFrame()
-    IDs = [str(uuid.uuid4()) for x in range(amount)]
+# Converts given IDs to a data frame format used in datacentres
+def toDF(IDs, generation, slotSize, duration, timeStep, dcID):
+    df = pd.DataFrame()    
 
     df['server_id'] = IDs
+    df['datacenter_id'] = dcID
     df['server_generation'] = generation
     df['slot_size'] = slotSize
-    df['bought_date'] = timeStep
-    df['expire_date'] = timeStep + lifeExp    
+    df['buy_date'] = timeStep
+    df['expire_date'] = timeStep + duration
 
     return df
 
-def manage(row):
-    generation = row['server_generation']
+def satisfy(row):
+    demanded_serverAmountList = [] # ['low', 'medium', high]
+    current_serverAmountList = [] # ['low', 'medium', high]
     timeStep = row['time_step']
 
+    # Server info
+    generation = row['server_generation']        
+    releaseRange = literal_eval(Server.getInfo(generation, 'release_time').values.tolist()[0])
+    startDate = releaseRange[0]
+    endDate = releaseRange[1]
+    slotSize = Server.getInfo(generation, 'slots_size').values[0].astype(int)    
+    capacity = Server.getInfo(generation, 'capacity').values[0].astype(int)    
+    duration = Server.getInfo(generation, 'life_expectancy').values[0].astype(int)
+
+    # Calculate demanded server amount for each latency sensitivity based on generation
     for ls in latencySensitivities:
-        serverAmount = 0
+        d = row[ls]
+        demanded_serverAmountList.append(math.ceil(d / capacity))
 
-        # Find data centre with matching latency sensitivity
-        for dc in dataCentres:
+    # Get current server amount for each latency sensitivity based on generaion
+    for ls in latencySensitivities:
+        a = 0
+
+        for dc in datacentres:
             if dc['latency_sensitivity'] == ls:
-                servers = dc['servers']
-                serverAmount += len(servers.loc[servers['server_generation'] == generation])                
+                s = dc['servers']
+                a += len(s.loc[s['server_generation'] == generation])
 
-        # Server info based on generation
-        capacity = Server.getInfo(generation, 'capacity').values[0].astype(int)
-        slotSize = Server.getInfo(generation, 'slots_size').values[0].astype(int)
-        lifeExp = Server.getInfo(generation, 'life_expectancy').values[0].astype(int)
-        releaseRange = literal_eval(Server.getInfo(generation, 'release_time').values.tolist()[0])
-        startDate = releaseRange[0]
-        endDate = releaseRange[1]
+        current_serverAmountList.append(a)
+    
+    # Find how many more servers are needed to satisfy demand based on the current amount of servers
+    a_sD = np.subtract(demanded_serverAmountList, current_serverAmountList) # ACTUAL SERVER DEMAND    
+    actualDF = pd.DataFrame(columns=latencySensitivities)
+    actualDF.loc[len(actualDF)] = a_sD
 
-        # Calculate server amount
-        demand = row[ls]
-        d_serverAmount = math.ceil(demand / capacity)
-        d_slotAmount = d_serverAmount * slotSize
-
-        # Gets actual demand based off previous records
-        d_serverAmount = d_serverAmount - serverAmount
-        d_slotAmount = d_slotAmount - (serverAmount * slotSize)
-
-        # Check if server generation can be bought with its release date
-        if not (startDate <= timeStep <= endDate):
-            continue
-
-        # If the demand is more than previous, buy more
-        if d_serverAmount > 0:
-            remainingServerAmount = d_serverAmount # For dictionary creation
-            remainingSlotAmount = d_slotAmount # For logic      
-            full = True
-
-            '''
-                Iterate through each data centre fill them with servers to meet demand.
+    # Check if server can be bought
+    if not startDate <= timeStep <= endDate:
+        return
+    
+    for ls in latencySensitivities:
+        a_dSA = actualDF[ls].values[0].astype(int) # Actual Demanded Server Amount
                 
-                Will fill a data centre with as much servers as possible to satisfy demand and any remaining servers will be bought in a different data centre
-                with the same latency sensitivity to satisfy demand.
-            '''
-            # BUY NEW SERVERS
-            for iDC in dataCentres:
-                if iDC['latency_sensitivity'] == ls:
-                    iServers = iDC['servers']
-                    iUsedSlots = iServers['slot_size'].sum()
-                    iMaxCapacity = iDC['slots_capacity']
-                    iAvailableSlots = iMaxCapacity - iUsedSlots
+        if a_dSA > 0: # If value is positive, buy more servers to try and meet demand
+            r_dASA = a_dSA # Remaining Actual Demanded Server Amount
 
-                    # Check if there are enough available slots to buy new servers
-                    if iAvailableSlots <= 0:
-                        continue
-                    
-                    full = False
-                    # Buy as much servers as possible to try and satisfy demand
-                    if remainingSlotAmount > iAvailableSlots:
-                        iAvailableServerAmount = math.floor(iAvailableSlots / slotSize)
-                        if iAvailableServerAmount <= 0:
-                            continue
-
-                        newServers = createNewServers(iAvailableServerAmount, generation, slotSize, timeStep, lifeExp, iDC['id'])
-                        ##Puts new server into Datacentre pd.array
-                        iDC['servers'] = pd.concat([iServers, newServers], ignore_index=True)
-                        addToDict(newServers['server_id'], timeStep, iDC['id'], newServers['server_generation'], 'buy')
-
-                        remainingServerAmount -= iAvailableServerAmount
-                        remainingSlotAmount -= (iAvailableServerAmount * slotSize)
-                    else: # Buy servers to meet demand                                                     
-                        newServers = createNewServers(remainingServerAmount, generation, slotSize, timeStep, lifeExp, iDC['id'])
-                        iDC['servers'] = pd.concat([iServers, newServers], ignore_index=True)
-                        addToDict(newServers['server_id'], timeStep, iDC['id'], newServers['server_generation'], 'buy')
-
-                        remainingServerAmount = 0
-                        remainingSlotAmount = 0
-                        break
+            dcInd = []
+            # Find datacentres with the same latency sensitivity
+            for i, dc in enumerate(datacentres):
+                if dc['latency_sensitivity'] == ls:
+                    dcInd.append(i)
             
-            # REPLACE OLD GENERATIONS
-"""             if remainingServerAmount > 0:
-                full = True
+            # Iterate through the datacentres
+            for i in dcInd:
+                dc = datacentres[i]
+                dcID = dc['ID']
+                s = dc['servers']
+                usedSlots = s['slot_size'].sum()
+                maxCapacity = dc['slots_capacity']
+                availableSlots = maxCapacity - usedSlots
+                availableServerAmount = math.floor(availableSlots / slotSize)
+
+                if availableServerAmount <= 0:
+                    continue
+
+                amount = 0
+                if r_dASA <= availableServerAmount: # If there are enough slots to buy and meet demand in current data centre
+                    amount = r_dASA
+
+                    r_dASA = 0
+                else: # Buy as much servers as possible to try and meet demand in current centre
+                    amount = availableServerAmount
+
+                    r_dASA -= availableServerAmount
+                
+                newServers = toDF([str(uuid.uuid4()) for x in range(amount)], generation, slotSize, duration, timeStep, dcID)
+                datacentres[i]['servers'] = pd.concat([datacentres[i]['servers'], newServers], ignore_index=True)
+                actions.extend(actionDict(newServers, 'buy', timeStep))
+                actionedServers.extend(newServers['server_id'].values.tolist())
+                
+                # Check if there are no more servers needed to be bought
+                if r_dASA <= 0:
+                    break
             
-            if not full:
+            # After buying, check if all servers were bought to meet demand, if not replace old generations
+            if r_dASA <= 0:
                 continue
-            ##Gets current server generation
-            generationNumber = int(generation[len(generation) - 1])
+
+            generationNumber = int(generation.split('.')[1][1])
             generationPrefix = generation[:len(generation) - 1]
 
+            # If generation nubmer is 1, move on as 1 is the oldest generation
             if generationNumber == 1:
                 continue
-            
-            for iDC in dataCentres:
-                if iDC['latency_sensitivity'] == ls:
-                    iServers = iDC['servers']
-                    iMaxCapacity = iDC['slots_capacity']
-                    oldServersDF = pd.DataFrame()
-                    oldServerIndicies = []
-                    oldGenerations = []
-                    #Writes the old generation by getting the prefix and the previous generation value
-                    for n in range(1, generationNumber):
-                        oldGenerations.append(generationPrefix + str(n))
-                    
-                    #identifies the old servers
-                    oldServers = iServers.loc[iServers['server_generation'].isin(oldGenerations)]                        
-                    oldServersDF = pd.concat([oldServersDF, oldServers], ignore_index=True)
-                    oldServerIndicies += oldServers.index.values.tolist()
 
-                    if oldServersDF.empty:
-                        continue
-                    ##Puts a number on how many
-                    oldServerAmount = len(oldServerIndicies)
-                    oldSlotAmount = oldServersDF['slot_size'].sum()
-                    
-                    if remainingServerAmount < oldServerAmount:
-                        ##Dismiss old servers and replace them with new generation servers
-                        iDC['servers'].drop(oldServerIndicies[:remainingServerAmount], inplace=True)
-                        addToDict(oldServers['server_id'][:remainingServerAmount], timeStep, iDC['id'], oldServers['server_generation'][:remainingServerAmount], 'dismiss')
-                        
-                        newServers = createNewServers(remainingServerAmount, generation, slotSize, timeStep, lifeExp, iDC['id'])
-                        iDC['servers'] = pd.concat([iDC['servers'], newServers], ignore_index=True)
-                        addToDict(newServers['server_id'], timeStep, iDC['id'], newServers['server_generation'], 'buy')
+            # Get old generations of current generation
+            oldGens = []
+            for n in range(1, generationNumber):
+                oldGens.append(generationPrefix + str(n))
 
-                        remainingServerAmount = 0
-                        remainingSlotAmount = 0
-                        break """
-"""                     else:
-                        iDC['servers'].drop(oldServerIndicies, inplace=True)
-                        addToDict(oldServers['server_id'], timeStep, iDC['id'], oldServers['server_generation'], 'dismiss')
+            dcInd = []
+            # Find datacentres with the same latency sensitivity
+            for i, dc in enumerate(datacentres):
+                if dc['latency_sensitivity'] == ls:
+                    dcInd.append(i)
 
-                        newServers = createNewServers(oldServerAmount, generation, slotSize, timeStep, lifeExp, iDC['id'])
-                        iDC['servers'] = pd.concat([iDC['servers'], newServers], ignore_index=True)
-                        addToDict(newServers['server_id'], timeStep, iDC['id'], newServers['server_generation'], 'buy')
+            # Iterate
+            for i in dcInd:
+                dc = datacentres[i]
+                dcID = dc['ID']
+                s = dc['servers']
+                oldServers = s.loc[s['server_generation'].isin(oldGens) & ~s['server_id'].isin(actionedServers)]
+                oldServerAmount = len(oldServers)
+                
+                # Check if there are no old servers
+                if oldServerAmount <= 0:
+                    continue
 
-                        remainingServerAmount -= oldServerAmount
-                        remainingSlotAmount -= oldSlotAmount """
-                                
-def get_solution(actualDemands):       
-    for t in range(1, timeSteps+1):
-        timeStepDemands = actualDemands.loc[actualDemands['time_step'] == t]
+                amount = 0
+                if r_dASA <= oldServerAmount: # If there are enough old servers, upgrade
+                    amount = r_dASA
 
-        # Management
+                    r_dASA = 0
+                else: # Upgrade as much servers as possible
+                    amount = oldServerAmount
+
+                    r_dASA -= oldServerAmount
+                
+                dismissedServers = oldServers[:amount]
+                dismissedIndicies = dismissedServers.index.values.tolist()
+
+                # Dismiss the old generation servers
+                datacentres[i]['servers'].drop(dismissedIndicies, inplace=True)
+                dismissedServers = toDF(dismissedServers['server_id'], dismissedServers['server_generation'], dismissedServers['slot_size'], dismissedServers['expire_date'], timeStep, dcID)
+                actions.extend(actionDict(dismissedServers, 'dismiss', timeStep))
+
+                # Buy the newest server
+                newServers = toDF([str(uuid.uuid4()) for x in range(amount)], generation, slotSize, duration, timeStep, dcID)
+                datacentres[i]['servers'] = pd.concat([datacentres[i]['servers'], newServers], ignore_index=True)
+                actions.extend(actionDict(newServers, 'buy', timeStep))
+                
+                '''
+                    Adds the new servers to a list called 'actionedServers'
+                    The purpose is to stop servers from having more than 1 action during the turn.
+                    When going through each row of the demand at a time step, multiple generations of a type will be demanded.
+                    The oldest one will go first -> buying as much servers as possible to meet demand and then upgrade old servers aswell.
+                    Then the next row of the demand is a newer version and without this it will dismiss the servers that were just bought at the same time step.
+                    Can not have more than 1 action for each server at each time step 
+                '''
+                actionedServers.extend(newServers['server_id'].values.tolist())
+
+
+
+def get_solution(demand):
+    for t in range(1, timeSteps + 1):
+        global actionedServers
+        actionedServers = []
+        # Check for expired servers at current time step
         checkExpiration(t)
-        timeStepDemands.apply(manage, axis=1)        
+        
+        # Server logic        
         print(t)
+        demand_t = demand.loc[demand['time_step'] == t]
+        demand_t = orderBy(demand_t, 'generation')
+        demand_t.apply(satisfy, axis=1)        
+
+    
     return actions
 
-
-##Given by the competition
-for seed in seeds:    
+for seed in seeds:
+    global actions, datacentres
     actions = []
-    ##creates an array that containes a Data Centre Dictionary 
-    ## that contains pandas frame to hold the server data
-    dataCentres = createDataCentres(4)
+    datacentres = createDataCentres()
 
-    # SET RANDOM SEED
+    # Set random seed
     np.random.seed(seed)
 
-    # GET RANDOMIZED DEMANDS
-    actualDemands = get_actual_demand(demandCSV)
+    # Randomize demand
+    demand = get_actual_demand(demandCSV)    
 
-    # CALCULATE
-    solution = get_solution(actualDemands)
-    ##Saves the data into a file with the format
-    with open('./output/Test/{}.json'.format(seed), 'w') as fp:
-        json.dump(solution, fp)
+    # Calculate
+    solution = get_solution(demand)    
 
-print('DONE!')
+    with open('{}.json'.format(seed), 'w') as fp:
+        json.dump(actions, fp)
+    print('SEED DONE ->', seed)

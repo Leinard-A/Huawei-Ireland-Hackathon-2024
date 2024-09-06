@@ -13,6 +13,8 @@ def known_seeds(mode):
                 2543, 
                 8501]
     elif mode == 'test':
+        return [2311]
+    elif mode == 'actual':
         return [3329, 
                 4201, 
                 8761, 
