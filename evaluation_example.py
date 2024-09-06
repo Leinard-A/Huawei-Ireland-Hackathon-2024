@@ -8,9 +8,9 @@ from seeds import known_seeds
 # DEFAULT SEED = 123
 # LOAD SOLUTION
 seeds = known_seeds('actual')
-m_seed = '2281'
+m_seed = 2281
 
-fileName = '{}.json'.format(m_seed)
+fileName = '{}.json'.format(str(m_seed))
 solution = load_solution(fileName)
 
 # LOAD PROBLEM DATA
