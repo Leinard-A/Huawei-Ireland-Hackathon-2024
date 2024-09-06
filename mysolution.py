@@ -52,7 +52,7 @@ def adjustFailure(capacity):
 def orderBy(demand_t, mode):
     newDF = demand_t.copy()
 
-    if mode == 'genType':
+    if mode == 'generation':
         genOrder = demand_t['server_generation'].values.tolist()
         genNums = [0] * len(genOrder)
 
@@ -62,7 +62,7 @@ def orderBy(demand_t, mode):
         newDF['GenNums'] = genNums
         newDF = newDF.sort_values(by=['GenNums'], ascending=False)
         newDF.drop(columns=['GenNums'], inplace=True)
-    elif mode == 'totalDemand':
+    elif mode == 'demand':
         totals = []
 
         for i, g in demand_t.iterrows():            
@@ -73,6 +73,22 @@ def orderBy(demand_t, mode):
         newDF['TotalDemand'] = totals
         newDF = newDF.sort_values(by=['TotalDemand'], ascending=False)
         newDF.drop(columns=['TotalDemand'], inplace=True)
+    elif mode == 'revenue':        
+        revenues = []
+
+        for i, g in demand_t.iterrows():            
+            tr = 0
+
+            for ls in latencySensitivities:
+                r = findRevenue(g['server_generation'], ls, g[ls])
+
+                tr += r
+            
+            revenues.append(tr)
+
+        newDF['TotalRevenue'] = revenues                
+        newDF = newDF.sort_values(by=['TotalRevenue'], ascending=False)                
+        newDF.drop(columns=['TotalRevenue'], inplace=True)        
 
     return newDF
 
@@ -265,7 +281,7 @@ def get_solution(demand):
         # Server logic        
         print(t)
         demand_t = demand.loc[demand['time_step'] == t]
-        demand_t = orderBy(demand_t, 'genType')
+        demand_t = orderBy(demand_t, 'generation')
         demand_t.apply(satisfy, axis=1)        
 
     

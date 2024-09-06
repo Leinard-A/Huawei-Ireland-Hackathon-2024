@@ -41,17 +41,3 @@ def findProfit(datacenter, generation, ls, t, expire, demand):
 
     print(revenue, cost)
     return revenue - cost 
-
-# print('---1')
-# findProfit('DC1', 'CPU.S1', 'high', 1, 96, 1000)
-# findProfit('DC1', 'CPU.S2', 'high', 1, 96, 1000)
-# findProfit('DC1', 'CPU.S3', 'high', 1, 96, 1000)
-# findProfit('DC1', 'CPU.S4', 'high', 1, 96, 1000)
-
-# print('---2')
-# findProfit('DC1', 'CPU.S1', 'high', 2, 96, 1000)
-# findProfit('DC1', 'CPU.S2', 'high', 2, 96, 1000)
-# findProfit('DC1', 'CPU.S3', 'high', 2, 96, 1000)
-# findProfit('DC1', 'CPU.S4', 'high', 2, 96, 1000)
-# # for i in range(1, 50):
-# #     print(findProfit('DC1', 'CPU.S4', 'high', i, 75, 1000))# 
