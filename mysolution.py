@@ -21,7 +21,7 @@ from profit import findRevenue
 demandCSV = pd.read_csv('data/demand.csv')
 
 # Known
-seeds = known_seeds('test')
+seeds = known_seeds('actual')
 latencySensitivities = getKnown('ls')
 timeSteps = getKnown('timeStep')
 order = True
@@ -278,8 +278,7 @@ def get_solution(demand):
         # Check for expired servers at current time step
         checkExpiration(t)
         
-        # Server logic        
-        print(t)
+        # Server logic   
         demand_t = demand.loc[demand['time_step'] == t]
         demand_t = orderBy(demand_t, 'generation')
         demand_t.apply(satisfy, axis=1)        

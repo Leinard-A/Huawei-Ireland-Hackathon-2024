@@ -421,16 +421,7 @@ def get_evaluation(solution,
 
         if verbose:
             print(output)
-
-    endDC1 = FLEET.loc[FLEET['datacenter_id'] == 'DC1']
-    endDC2 = FLEET.loc[FLEET['datacenter_id'] == 'DC2']
-    endDC3 = FLEET.loc[FLEET['datacenter_id'] == 'DC3']
-    endDC4 = FLEET.loc[FLEET['datacenter_id'] == 'DC4']
-    slots = [endDC1['slots_size'].sum(),
-             endDC2['slots_size'].sum(),
-             endDC3['slots_size'].sum(),
-             endDC4['slots_size'].sum()]
-    print(slots)        
+    
     return OBJECTIVE
 
 

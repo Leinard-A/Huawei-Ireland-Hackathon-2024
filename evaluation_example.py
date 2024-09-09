@@ -7,20 +7,21 @@ from seeds import known_seeds
 
 # DEFAULT SEED = 123
 # LOAD SOLUTION
-fileName = '2311.json'
+seeds = known_seeds('actual')
+m_seed = 2281
+
+fileName = '{}.json'.format(str(m_seed))
 solution = load_solution(fileName)
 
 # LOAD PROBLEM DATA
 demand, datacenters, servers, selling_prices = load_problem_data('data/')
 
 # EVALUATE THE SOLUTION
-fileSeed = int(fileName.split('.')[0])
-
 score = evaluation_function(solution,
                             demand,
                             datacenters,
                             servers,
                             selling_prices,
-                            seed=fileSeed)
+                            seed=m_seed)
 
-print(score)
+print(m_seed, score)
